@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threat Intelligence Lab — Week 6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1A0B2E; --bg2:#241241; --panel:#2D1B4E; --panel2:#3A2464;
+  --line:#5B3A8E;
+  --text:#F4EEFF; --muted:#B6A3D6;
+  --orange:#FF6B35; --pink:#F72585; --blue:#4CC9F0; --gold:#FFD60A; --green:#3DDC84; --red:#FF3860;
+  --font-pixel:'Silkscreen',monospace; --font-mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0; background:var(--bg); color:var(--text); font-family:var(--font-mono); line-height:1.6; -webkit-font-smoothing:antialiased;}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; scroll-behavior:auto !important;}}
+h1,h2,h3,h4{font-family:var(--font-pixel); margin:0; line-height:1.5;}
+p{margin:0;}
+a{color:inherit;}
+button{font-family:var(--font-pixel);}
+::selection{background:var(--orange); color:#1A0B2E;}
+::-webkit-scrollbar{width:12px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--line); border:2px solid var(--bg);}
+:focus-visible{outline:3px solid var(--gold); outline-offset:2px;}
+
+#scanlines{position:fixed; inset:0; pointer-events:none; z-index:9998;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 1px, transparent 2px, transparent 4px);
+  mix-blend-mode:overlay;
+}
+#vignette{position:fixed; inset:0; pointer-events:none; z-index:9997; box-shadow: inset 0 0 200px rgba(10,4,20,0.8);}
+
+.wrap{max-width:960px; margin:0 auto; padding:0 22px;}
+.pixel-panel{border:3px solid var(--line); background:var(--panel); box-shadow:5px 5px 0 rgba(0,0,0,0.5);}
+
+/* TOP CARTRIDGE NAV */
+#hud{position:sticky; top:0; z-index:100; background:var(--bg2); border-bottom:3px solid var(--line);}
+.hud-inner{display:flex; align-items:center; gap:16px; padding:10px 18px; overflow-x:auto;}
+.hud-logo{font-family:var(--font-pixel); font-size:0.65rem; color:var(--gold); white-space:nowrap; text-shadow:2px 2px 0 var(--pink);}
+.cart-row{display:flex; gap:8px; flex:1;}
+.cart{font-family:var(--font-mono); font-weight:700; font-size:0.66rem; padding:9px 13px; border-radius:5px 5px 0 0; background:var(--panel); border:2px solid var(--line); border-bottom:none; color:var(--muted); cursor:pointer; white-space:nowrap; text-decoration:none; transition:all .15s;}
+.cart:hover{color:var(--blue); border-color:var(--blue);}
+.cart.active{color:var(--gold); border-color:var(--gold); background:var(--panel2);}
+#progressBar{height:5px; background:var(--panel);}
+#progressFill{height:100%; width:0%; background:repeating-linear-gradient(90deg,var(--pink) 0 8px, var(--orange) 8px 16px); transition:width .2s;}
+
+main{overflow-x:hidden;}
+
+/* HERO */
+.hero{position:relative; padding:80px 22px 60px; text-align:center; border-bottom:3px solid var(--line); overflow:hidden; background:radial-gradient(ellipse at 50% 120%, #3A2464 0%, #1A0B2E 70%);}
+.hero-title{font-family:var(--font-pixel); font-size:clamp(1.2rem,4vw,2.2rem); color:var(--gold); text-shadow:3px 3px 0 var(--pink), 6px 6px 0 rgba(0,0,0,0.35); line-height:1.8; margin-bottom:20px;}
+.hero-sub{font-family:var(--font-mono); font-size:1.02rem; color:var(--blue); max-width:600px; margin:0 auto 26px; line-height:1.6;}
+.insert-coin{font-family:var(--font-pixel); font-size:0.72rem; color:var(--text); animation:blink 1s steps(2) infinite;}
+@keyframes blink{50%{opacity:0;}}
+.hero-stats{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin:26px 0;}
+.hero-stat{font-family:var(--font-mono); font-weight:700; font-size:0.68rem; padding:9px 14px; border:2px solid var(--line); color:var(--muted); background:var(--panel); border-radius:4px;}
+.hero-stat.hi{border-color:var(--red); color:var(--red);}
+.grid-bg{position:absolute; inset:0; z-index:0; opacity:0.5;}
+
+/* LEVEL SECTIONS */
+.level{padding:64px 22px; border-bottom:3px solid var(--line); position:relative;}
+.level:nth-of-type(even){background:var(--bg2);}
+.level-head{text-align:center; margin-bottom:30px;}
+.level-num{font-family:var(--font-pixel); font-size:0.6rem; color:var(--pink); display:block; margin-bottom:12px;}
+.level-title{font-family:var(--font-pixel); font-size:clamp(1rem,2.8vw,1.4rem); color:var(--gold); line-height:1.8;}
+
+.reveal{opacity:0; transform:translateY(20px); transition:opacity .6s ease, transform .6s ease;}
+.reveal.visible{opacity:1; transform:translateY(0);}
+
+/* BRIEFING */
+.briefing{max-width:660px; margin:0 auto 24px; padding:18px 22px; background:var(--bg); border:3px solid var(--line); border-radius:6px;}
+.briefing .brief-lbl{font-family:var(--font-pixel); font-size:0.55rem; color:var(--green); margin-bottom:12px; display:block;}
+.briefing ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px;}
+.briefing li{font-family:var(--font-mono); font-size:0.92rem; color:var(--text); padding-left:20px; position:relative;}
+.briefing li::before{content:"◆"; position:absolute; left:0; color:var(--blue); font-size:0.7rem;}
+.briefing li b{color:var(--gold);}
+
+.stat-strip{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; max-width:660px; margin:0 auto 24px;}
+.stat-block{text-align:center; background:var(--bg); border:3px solid var(--line); border-radius:6px; padding:12px 18px; min-width:120px;}
+.stat-block .num{font-family:var(--font-pixel); font-size:1.2rem; color:var(--orange); text-shadow:2px 2px 0 rgba(0,0,0,0.4);}
+.stat-block .lbl{font-family:var(--font-mono); font-size:0.62rem; color:var(--muted); margin-top:6px; display:block;}
+
+.info-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; max-width:660px; margin:0 auto 24px;}
+.info-card{background:var(--bg); border:2px solid var(--line); border-radius:6px; padding:12px 14px;}
+.info-card .term{font-family:var(--font-pixel); font-size:0.52rem; color:var(--blue); margin-bottom:8px; display:block;}
+.info-card p{font-family:var(--font-mono); font-size:0.82rem; color:var(--muted); line-height:1.4;}
+
+/* GAME FRAME */
+.game-frame{max-width:740px; margin:0 auto; background:var(--bg); border:3px solid var(--line); box-shadow:6px 6px 0 rgba(0,0,0,0.5); border-radius:6px; overflow:hidden;}
+.game-topbar{display:flex; justify-content:space-between; align-items:center; padding:9px 16px; background:var(--panel2); border-bottom:2px solid var(--line); font-family:var(--font-pixel); font-size:0.52rem; flex-wrap:wrap; gap:8px;}
+.game-topbar .stat{color:var(--blue);}
+.game-topbar .stat b{color:var(--gold);}
+.game-stage{position:relative; min-height:340px; overflow:hidden; background:
+  linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size:22px 22px;
+}
+.game-overlay{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:rgba(26,11,46,0.94); z-index:20; text-align:center; padding:20px;}
+.game-overlay h3{font-size:0.95rem; color:var(--gold); line-height:1.8;}
+.game-overlay p{font-family:var(--font-mono); font-size:0.9rem; color:var(--muted); max-width:440px;}
+.px-btn{font-family:var(--font-pixel); font-size:0.62rem; padding:13px 20px; background:var(--pink); color:#1A0B2E; border:none; cursor:pointer; box-shadow:4px 4px 0 rgba(0,0,0,0.5); border-radius:4px; transition:transform .1s;}
+.px-btn:hover{transform:translate(-2px,-2px); box-shadow:6px 6px 0 rgba(0,0,0,0.5);}
+.px-btn:active{transform:translate(2px,2px); box-shadow:1px 1px 0 rgba(0,0,0,0.5);}
+.px-btn.alt{background:var(--blue);}
+.px-btn.ghost{background:transparent; border:2px solid var(--line); color:var(--muted); box-shadow:none;}
+
+/* ===== L1: Memory Match ===== */
+.mem-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; padding:20px; max-width:600px; margin:0 auto;}
+.mem-card{aspect-ratio:1; perspective:600px; cursor:pointer;}
+.mem-card-inner{position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform .35s;}
+.mem-card.flipped .mem-card-inner, .mem-card.matched .mem-card-inner{transform:rotateY(180deg);}
+.mem-face{position:absolute; inset:0; backface-visibility:hidden; border-radius:5px; display:flex; align-items:center; justify-content:center; text-align:center; padding:6px; font-family:var(--font-mono); font-size:0.68rem; font-weight:700;}
+.mem-front{background:var(--panel2); border:2px solid var(--line); color:var(--gold); font-family:var(--font-pixel); font-size:1.1rem;}
+.mem-back{background:var(--bg2); border:2px solid var(--blue); color:var(--text); transform:rotateY(180deg);}
+.mem-card.matched .mem-back{border-color:var(--green); color:var(--green);}
+
+/* ===== L2: Conveyor Sort ===== */
+.conveyor-track{position:absolute; top:60px; left:0; right:0; height:70px; background:repeating-linear-gradient(90deg, var(--panel2) 0 20px, var(--bg2) 20px 40px); border-top:3px solid var(--line); border-bottom:3px solid var(--line);}
+.ioc-chip{position:absolute; top:72px; width:110px; padding:8px 6px; text-align:center; font-family:var(--font-mono); font-size:0.62rem; font-weight:700; background:var(--panel); border:2px solid var(--gold); color:var(--gold); border-radius:4px; cursor:grab;}
+.bin-row{position:absolute; bottom:14px; left:0; right:0; display:flex; justify-content:space-around; padding:0 16px;}
+.bin{width:150px; text-align:center; padding:14px 6px; border:3px dashed var(--line); border-radius:8px; font-family:var(--font-pixel); font-size:0.5rem; color:var(--muted); transition:all .15s;}
+.bin.dragover{border-color:var(--gold); background:rgba(255,214,10,0.08);}
+
+/* ===== L3: Maze Crawler ===== */
+.maze-grid{display:grid; gap:2px; margin:20px auto; width:fit-content;}
+.maze-cell{width:34px; height:34px; background:var(--bg2); position:relative;}
+.maze-cell.wall{background:var(--panel2); border:1px solid var(--line);}
+.maze-cell.good{display:flex; align-items:center; justify-content:center; color:var(--green); font-size:1rem;}
+.maze-cell.bad{display:flex; align-items:center; justify-content:center; color:var(--red); font-size:1rem;}
+.maze-player{position:absolute; width:26px; height:26px; background:var(--blue); border-radius:50%; box-shadow:0 0 10px var(--blue); transition:top .1s, left .1s; z-index:5;}
+
+/* ===== L4: Signal Decoder (Simon) ===== */
+.simon-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:320px; margin:20px auto;}
+.simon-pad{aspect-ratio:1; border-radius:10px; border:3px solid var(--line); cursor:pointer; font-family:var(--font-pixel); font-size:0.6rem; color:#1A0B2E; display:flex; align-items:center; justify-content:center; text-align:center; opacity:0.55; transition:all .12s;}
+.simon-pad.lit{opacity:1; transform:scale(0.96); box-shadow:0 0 24px currentColor;}
+.simon-pad.p0{background:var(--pink);}
+.simon-pad.p1{background:var(--blue);}
+.simon-pad.p2{background:var(--gold);}
+.simon-pad.p3{background:var(--green);}
+
+/* ===== L5: Whack the Gap ===== */
+.whack-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:30px 20px; max-width:460px; margin:0 auto;}
+.whack-hole{aspect-ratio:1; border-radius:50%; background:var(--bg2); border:3px solid var(--line); position:relative; overflow:hidden; cursor:pointer;}
+.whack-mole{position:absolute; left:50%; bottom:-100%; transform:translateX(-50%); width:70%; height:70%; border-radius:8px; display:flex; align-items:center; justify-content:center; text-align:center; font-family:var(--font-mono); font-size:0.6rem; font-weight:700; padding:4px; transition:bottom .18s;}
+.whack-mole.up{bottom:12%;}
+.whack-mole.gap{background:var(--red); color:#fff;}
+.whack-mole.decoy{background:var(--green); color:#1A0B2E;}
+
+/* ===== L6: Boss Battle ===== */
+.boss-arena{display:flex; flex-direction:column; align-items:center; gap:16px; padding:24px 20px;}
+.health-row{display:flex; justify-content:space-between; width:100%; max-width:560px; gap:20px;}
+.health-block{flex:1;}
+.health-label{font-family:var(--font-pixel); font-size:0.48rem; color:var(--muted); margin-bottom:6px; display:block;}
+.health-track{height:18px; background:var(--panel2); border:2px solid var(--line); border-radius:3px;}
+.health-fill{height:100%; transition:width .3s;}
+.health-fill.boss{background:var(--red);}
+.health-fill.player{background:var(--green);}
+.boss-sprite{width:76px; height:76px; background:var(--pink); clip-path:polygon(15% 0%,85% 0%,100% 45%,100% 100%,0% 100%,0% 45%); transition:transform .1s;}
+.boss-sprite.hit{animation:shake .25s;}
+@keyframes shake{25%{transform:translateX(-8px) rotate(-3deg);}75%{transform:translateX(8px) rotate(3deg);}}
+.boss-q{font-family:var(--font-mono); font-size:1.05rem; text-align:center; max-width:560px; color:var(--text);}
+.boss-opts{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; max-width:560px;}
+.boss-opt{font-family:var(--font-mono); font-size:0.8rem; padding:11px 13px; background:var(--panel2); border:2px solid var(--line); color:var(--text); cursor:pointer; text-align:left; border-radius:4px;}
+.boss-opt:hover{border-color:var(--blue);}
+.boss-opt.correct{border-color:var(--green); background:rgba(61,220,132,0.15); color:var(--green);}
+.boss-opt.incorrect{border-color:var(--red); background:rgba(255,56,96,0.15); color:var(--red);}
+
+footer{padding:40px 22px; text-align:center; color:var(--muted); font-family:var(--font-pixel); font-size:0.48rem; line-height:2;}
+</style>
+
+<style id="modern-fullscreen-theme">
+:root{
+  --bg:#07111F;
+  --bg2:#0A1728;
+  --panel:rgba(15,31,50,.82);
+  --panel2:rgba(21,42,66,.92);
+  --line:rgba(145,186,220,.20);
+  --text:#F3F8FC;
+  --muted:#9EB0C2;
+  --orange:#FFB86A;
+  --pink:#8B7CFF;
+  --blue:#4FD8FF;
+  --gold:#FFD37A;
+  --green:#4EE0B5;
+  --red:#FF6B7D;
+  --font-pixel:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --shadow:0 24px 70px rgba(0,0,0,.28);
+  --radius:22px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{
+  margin:0;
+  width:100%;
+  min-width:0;
+  background:
+    radial-gradient(circle at 12% -10%,rgba(79,216,255,.12),transparent 28%),
+    radial-gradient(circle at 88% 0%,rgba(139,124,255,.10),transparent 30%),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--font-pixel);
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+#scanlines,#vignette{display:none!important}
+h1,h2,h3,h4{font-family:var(--font-pixel);letter-spacing:-.03em;line-height:1.15;text-transform:none}
+button{font-family:var(--font-pixel)}
+::selection{background:rgba(79,216,255,.28);color:#fff}
+::-webkit-scrollbar{width:10px}
+::-webkit-scrollbar-track{background:#07111F}
+::-webkit-scrollbar-thumb{background:#27415b;border:2px solid #07111F;border-radius:999px}
+:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+
+main{width:100%;max-width:none!important;overflow:visible}
+.wrap{
+  width:min(1520px,calc(100% - clamp(32px,7vw,120px)));
+  max-width:none!important;
+  margin:0 auto;
+  padding:0!important;
+}
+
+/* ---------- navigation ---------- */
+#hud{
+  position:sticky;
+  top:0;
+  z-index:100;
+  background:rgba(7,17,31,.78);
+  border:0;
+  border-bottom:1px solid var(--line);
+  backdrop-filter:blur(18px) saturate(135%);
+  -webkit-backdrop-filter:blur(18px) saturate(135%);
+}
+.hud-inner{
+  width:min(1580px,calc(100% - 36px));
+  margin:0 auto;
+  display:flex;
+  align-items:center;
+  gap:22px;
+  padding:13px 0 11px;
+  overflow-x:auto;
+}
+.hud-logo{
+  font-family:var(--font-pixel);
+  font-weight:800;
+  font-size:.82rem;
+  letter-spacing:.08em;
+  color:#fff;
+  white-space:nowrap;
+  text-shadow:none;
+}
+.cart-row{display:flex;gap:8px;flex:1;justify-content:flex-end}
+.cart{
+  font-family:var(--font-pixel);
+  font-weight:600;
+  font-size:.74rem;
+  padding:8px 12px;
+  border-radius:999px;
+  background:transparent;
+  border:1px solid transparent;
+  color:var(--muted);
+  text-decoration:none;
+  transition:.2s ease;
+}
+.cart:hover{color:#fff;border-color:var(--line);background:rgba(255,255,255,.04)}
+.cart.active{
+  color:#07111F;
+  border-color:transparent;
+  background:linear-gradient(135deg,var(--blue),var(--green));
+  box-shadow:0 8px 24px rgba(79,216,255,.16);
+}
+#progressBar{height:3px;background:rgba(255,255,255,.04)}
+#progressFill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg,var(--blue),var(--green),var(--pink));
+  transition:width .2s;
+}
+
+/* ---------- hero ---------- */
+.hero{
+  width:100%;
+  min-height:calc(100vh - 58px);
+  padding:clamp(80px,9vw,150px) clamp(24px,7vw,120px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  border:0;
+  border-bottom:1px solid var(--line);
+  overflow:hidden;
+  position:relative;
+  background:
+    radial-gradient(circle at 50% 68%,rgba(79,216,255,.09),transparent 28%),
+    linear-gradient(180deg,rgba(255,255,255,.01),transparent 60%);
+}
+.hero::before,.hero::after{
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  filter:blur(2px);
+  pointer-events:none;
+}
+.hero::before{
+  width:520px;height:520px;left:-220px;top:18%;
+  background:radial-gradient(circle,rgba(79,216,255,.10),transparent 66%);
+}
+.hero::after{
+  width:560px;height:560px;right:-260px;bottom:-110px;
+  background:radial-gradient(circle,rgba(139,124,255,.10),transparent 66%);
+}
+.grid-bg{opacity:.16!important;filter:saturate(.4)}
+.hero>div{width:min(1080px,100%)}
+.hero-title{
+  font-family:var(--font-pixel);
+  font-size:clamp(2.9rem,7vw,6.6rem);
+  font-weight:800;
+  color:#fff;
+  text-shadow:none;
+  letter-spacing:-.055em;
+  line-height:.96;
+  margin-bottom:28px;
+}
+.hero-sub{
+  font-family:var(--font-pixel);
+  font-size:clamp(1.05rem,1.5vw,1.28rem);
+  color:var(--muted);
+  max-width:780px;
+  margin:0 auto 32px;
+  line-height:1.7;
+}
+.hero-stats{gap:10px;margin:30px 0}
+.hero-stat{
+  font-family:var(--font-pixel);
+  font-weight:600;
+  font-size:.78rem;
+  padding:9px 14px;
+  border:1px solid var(--line);
+  color:#b9c9d8;
+  background:rgba(255,255,255,.035);
+  border-radius:999px;
+  backdrop-filter:blur(10px);
+}
+.hero-stat.hi{border-color:rgba(79,216,255,.36);color:var(--blue)}
+.insert-coin{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:44px;
+  padding:0 18px;
+  border-radius:999px;
+  background:linear-gradient(135deg,var(--blue),var(--green));
+  color:#06101c;
+  font-family:var(--font-pixel);
+  font-size:.78rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  animation:none;
+  box-shadow:0 14px 38px rgba(79,216,255,.18);
+}
+
+/* ---------- full-screen modules ---------- */
+.level{
+  width:100%;
+  min-height:100vh;
+  padding:clamp(78px,8vw,124px) 0;
+  border:0;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  position:relative;
+  background:transparent;
+}
+.level:nth-of-type(even){
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.018),rgba(255,255,255,.008)),
+    var(--bg2);
+}
+.level .wrap{
+  display:grid;
+  grid-template-columns:minmax(0,.9fr) minmax(520px,1.1fr);
+  gap:clamp(30px,5vw,72px);
+  align-items:start;
+}
+.level-head{
+  grid-column:1/-1;
+  text-align:left;
+  margin-bottom:10px;
+  max-width:1000px;
+}
+.level-num{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  margin:0 0 14px;
+  font-family:var(--font-pixel);
+  font-size:.72rem;
+  font-weight:800;
+  letter-spacing:.12em;
+  color:var(--green);
+  text-transform:uppercase;
+}
+.level-num::before{
+  content:"";
+  width:30px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--green),var(--blue));
+}
+.level-title{
+  font-family:var(--font-pixel);
+  font-size:clamp(2rem,4.3vw,4.2rem);
+  font-weight:800;
+  color:#fff;
+  line-height:1.02;
+  letter-spacing:-.045em;
+}
+.briefing{
+  grid-column:1;
+  max-width:none;
+  width:100%;
+  margin:0;
+  padding:24px 26px;
+  background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.025));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:0 10px 40px rgba(0,0,0,.12);
+}
+.briefing .brief-lbl{
+  font-family:var(--font-pixel);
+  font-size:.68rem;
+  font-weight:800;
+  letter-spacing:.11em;
+  color:var(--blue);
+  margin-bottom:16px;
+  text-transform:uppercase;
+}
+.briefing ul{gap:13px}
+.briefing li{
+  font-family:var(--font-pixel);
+  font-size:clamp(.96rem,1.05vw,1.07rem);
+  color:#dfe8ef;
+  padding-left:22px;
+  line-height:1.58;
+}
+.briefing li::before{content:"";width:8px;height:8px;top:.65em;border-radius:50%;background:var(--green)}
+.briefing li b{color:#fff}
+
+.stat-strip{
+  grid-column:1;
+  max-width:none;
+  width:100%;
+  margin:18px 0 0;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.stat-block{
+  min-width:0;
+  text-align:left;
+  background:rgba(255,255,255,.025);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:18px 20px;
+}
+.stat-block .num{
+  font-family:var(--font-pixel);
+  font-size:clamp(1.45rem,2.3vw,2.25rem);
+  font-weight:800;
+  color:var(--gold);
+  text-shadow:none;
+}
+.stat-block .lbl{
+  font-family:var(--font-pixel);
+  font-size:.72rem;
+  color:var(--muted);
+  margin-top:7px;
+}
+.info-grid{
+  grid-column:1;
+  max-width:none;
+  width:100%;
+  margin:18px 0 0;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.info-card{
+  background:rgba(255,255,255,.025);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:18px;
+}
+.info-card .term{
+  font-family:var(--font-pixel);
+  font-size:.68rem;
+  font-weight:800;
+  letter-spacing:.08em;
+  color:var(--blue);
+  margin-bottom:9px;
+}
+.info-card p{
+  font-family:var(--font-pixel);
+  font-size:.88rem;
+  color:var(--muted);
+  line-height:1.55;
+}
+
+/* game is the visual anchor on the right */
+.game-frame{
+  grid-column:2;
+  grid-row:2 / span 5;
+  width:100%;
+  max-width:none;
+  margin:0;
+  background:rgba(8,20,34,.84);
+  border:1px solid rgba(145,186,220,.24);
+  box-shadow:var(--shadow);
+  border-radius:26px;
+  overflow:hidden;
+  backdrop-filter:blur(16px);
+}
+.game-topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:13px 18px;
+  background:rgba(255,255,255,.045);
+  border:0;
+  border-bottom:1px solid var(--line);
+  font-family:var(--font-pixel);
+  font-size:.68rem;
+  font-weight:700;
+  letter-spacing:.03em;
+}
+.game-topbar .stat{color:var(--muted)}
+.game-topbar .stat b{color:#fff}
+.game-stage{
+  position:relative;
+  min-height:clamp(430px,52vh,620px);
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 50% 45%,rgba(79,216,255,.055),transparent 38%),
+    linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+  background-size:auto,34px 34px,34px 34px;
+}
+.game-overlay{
+  background:rgba(7,17,31,.90);
+  backdrop-filter:blur(14px);
+  gap:18px;
+  padding:32px;
+}
+.game-overlay h3{
+  font-family:var(--font-pixel);
+  font-size:clamp(1.5rem,2.4vw,2.3rem);
+  font-weight:800;
+  color:#fff;
+  line-height:1.1;
+}
+.game-overlay p{
+  font-family:var(--font-pixel);
+  font-size:.98rem;
+  color:var(--muted);
+  max-width:520px;
+  line-height:1.6;
+}
+.px-btn{
+  font-family:var(--font-pixel);
+  font-size:.8rem;
+  font-weight:800;
+  letter-spacing:.02em;
+  padding:13px 20px;
+  border:0;
+  border-radius:12px;
+  background:linear-gradient(135deg,var(--blue),var(--green));
+  color:#06111f;
+  box-shadow:0 12px 28px rgba(79,216,255,.16);
+  transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;
+}
+.px-btn:hover{transform:translateY(-2px);box-shadow:0 17px 34px rgba(79,216,255,.22);filter:brightness(1.04)}
+.px-btn:active{transform:translateY(0);box-shadow:0 8px 18px rgba(79,216,255,.14)}
+.px-btn.alt{background:linear-gradient(135deg,var(--pink),#b6aaff);color:#fff}
+.px-btn.ghost{background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--text);box-shadow:none}
+
+/* game-specific restyling */
+.mem-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:28px;max-width:720px}
+.mem-face{border-radius:14px;font-family:var(--font-pixel);font-size:.74rem}
+.mem-front{background:linear-gradient(145deg,#17324a,#10243a);border:1px solid var(--line);color:var(--blue);font-family:var(--font-pixel);font-size:1rem}
+.mem-back{background:#0e2236;border:1px solid rgba(79,216,255,.34);color:#fff}
+.mem-card.matched .mem-back{border-color:rgba(78,224,181,.7);color:var(--green);box-shadow:0 0 0 1px rgba(78,224,181,.18)}
+
+.conveyor-track{
+  top:76px;
+  height:72px;
+  background:linear-gradient(90deg,rgba(255,255,255,.025),rgba(79,216,255,.055),rgba(255,255,255,.025));
+  border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);
+}
+.ioc-chip{
+  top:88px;
+  width:126px;
+  padding:10px 8px;
+  font-family:var(--font-mono);
+  font-size:.68rem;
+  background:#10283d;
+  border:1px solid rgba(255,211,122,.48);
+  color:var(--gold);
+  border-radius:10px;
+  box-shadow:0 9px 20px rgba(0,0,0,.22);
+}
+.bin{width:31%;max-width:190px;padding:16px 8px;border:1px dashed rgba(145,186,220,.34);border-radius:14px;font-family:var(--font-pixel);font-size:.66rem}
+.bin.dragover{border-color:var(--blue);background:rgba(79,216,255,.08)}
+
+.maze-grid{gap:3px;margin:28px auto}
+.maze-cell{width:38px;height:38px;background:#0d1d2e;border-radius:7px}
+.maze-cell.wall{background:#172b40;border:1px solid rgba(145,186,220,.14)}
+.maze-player{background:linear-gradient(135deg,var(--blue),var(--green));border-radius:50%;box-shadow:0 0 24px rgba(79,216,255,.45)}
+
+.simon-grid{gap:12px;max-width:380px;margin:28px auto}
+.simon-pad{border-radius:24px;border:1px solid var(--line);font-family:var(--font-pixel);font-size:.72rem;color:#07111F;opacity:.62;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.simon-pad.lit{opacity:1;transform:scale(.97);box-shadow:0 0 35px currentColor}
+
+.whack-grid{gap:16px;padding:32px 24px;max-width:540px}
+.whack-hole{border-radius:24px;background:#0c1d2d;border:1px solid var(--line);overflow:hidden}
+.whack-mole{border-radius:16px;font-family:var(--font-pixel);font-size:.68rem;box-shadow:0 12px 28px rgba(0,0,0,.25)}
+.whack-mole.gap{background:linear-gradient(145deg,#ff7a8b,#d84f66)}
+.whack-mole.decoy{background:linear-gradient(145deg,#62e4bf,#2fc59a);color:#06111f}
+
+.boss-arena{gap:20px;padding:34px 26px}
+.health-row{max-width:720px}
+.health-label{font-family:var(--font-pixel);font-size:.66rem}
+.health-track{height:12px;background:#13273a;border:0;border-radius:999px;overflow:hidden}
+.health-fill.boss{background:linear-gradient(90deg,#ff6b7d,#ff9a6c)}
+.health-fill.player{background:linear-gradient(90deg,var(--green),var(--blue))}
+.boss-sprite{width:96px;height:96px;background:linear-gradient(145deg,#8b7cff,#4fd8ff);border-radius:30px;clip-path:none;box-shadow:0 20px 40px rgba(79,216,255,.12)}
+.boss-q{font-family:var(--font-pixel);font-size:1.12rem;max-width:720px;color:#fff}
+.boss-opts{max-width:760px;gap:12px}
+.boss-opt{font-family:var(--font-pixel);font-size:.84rem;padding:14px 16px;background:#10253a;border:1px solid var(--line);border-radius:12px;color:var(--text);transition:.18s ease}
+.boss-opt:hover{border-color:rgba(79,216,255,.6);transform:translateY(-1px)}
+.boss-opt.correct{border-color:rgba(78,224,181,.7);background:rgba(78,224,181,.10);color:var(--green)}
+.boss-opt.incorrect{border-color:rgba(255,107,125,.7);background:rgba(255,107,125,.10);color:var(--red)}
+
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .55s ease,transform .55s ease}
+.reveal.visible{opacity:1;transform:none}
+footer{
+  width:100%;
+  padding:54px clamp(24px,7vw,110px);
+  border-top:1px solid var(--line);
+  color:#71869a;
+  font-family:var(--font-pixel);
+  font-size:.75rem;
+  line-height:1.9;
+  text-align:center;
+  background:#06101c;
+}
+
+/* ---------- responsive ---------- */
+@media(max-width:1120px){
+  .level{min-height:auto}
+  .level .wrap{grid-template-columns:1fr;gap:22px}
+  .game-frame{grid-column:1;grid-row:auto;margin-top:8px}
+  .briefing,.stat-strip,.info-grid{grid-column:1}
+  .game-stage{min-height:500px}
+  .level-head{margin-bottom:4px}
+}
+@media(max-width:760px){
+  .wrap{width:calc(100% - 28px)}
+  .hud-inner{width:calc(100% - 20px);gap:10px}
+  .hud-logo{display:none}
+  .cart-row{justify-content:flex-start}
+  .cart{font-size:.68rem;padding:7px 10px}
+  .hero{min-height:88vh;padding:76px 22px}
+  .hero-title{font-size:clamp(2.45rem,13vw,4.1rem)}
+  .level{padding:68px 0}
+  .level-title{font-size:clamp(2rem,10vw,3rem)}
+  .stat-strip,.info-grid{grid-template-columns:1fr}
+  .game-frame{border-radius:18px}
+  .game-stage{min-height:440px}
+  .mem-grid{gap:8px;padding:18px}
+  .mem-face{font-size:.58rem}
+  .bin-row{padding:0 8px;gap:7px}
+  .bin{font-size:.53rem;padding:13px 4px}
+  .maze-cell{width:29px;height:29px}
+  .boss-opts{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
+</style>
+
+</head>
+<body>
+<script>if("scrollRestoration" in history) history.scrollRestoration="manual";</script>
+<div id="scanlines"></div>
+<div id="vignette"></div>
+<div id="hud">
+  <div class="hud-inner">
+    <div class="hud-logo">THREAT INTELLIGENCE LAB · WEEK 6</div>
+    <div class="cart-row" id="cartRow">
+      <a href="#l1" class="cart">L1 CTI</a>
+      <a href="#l2" class="cart">L2 IOCs</a>
+      <a href="#l3" class="cart">L3 SOURCES</a>
+      <a href="#l4" class="cart">L4 SHARING</a>
+      <a href="#l5" class="cart">L5 TIPs</a>
+      <a href="#l6" class="cart">BOSS</a>
+    </div>
+  </div>
+  <div id="progressBar"><div id="progressFill"></div></div>
+</div>
+
+<main>
+  <header class="hero" id="top">
+    <svg class="grid-bg" id="gridBg" width="100%" height="100%"></svg>
+    <div style="position:relative; z-index:2;">
+      <div class="hero-title">THREAT<br>INTELLIGENCE<br>PLATFORMS</div>
+      <p class="hero-sub">From raw signals to a working collaborative defense platform — six levels, six games.</p>
+      <div class="hero-stats">
+        <div class="hero-stat hi">6 INTERACTIVE LABS</div>
+        <div class="hero-stat">LEARN · PRACTISE · TEST</div>
+      </div>
+      <div class="insert-coin">SCROLL TO START · INTERACTIVE WEEK 6</div>
+    </div>
+  </header>
+
+  <!-- ============ LEVEL 1 — CTI FOUNDATIONS ============ -->
+  <section class="level" id="l1">
+    <div class="wrap">
+      <div class="level-head reveal">
+        <span class="level-num">MODULE 1 / 6</span>
+        <h2 class="level-title">CTI FOUNDATIONS</h2>
+      </div>
+      <div class="briefing reveal">
+        <span class="brief-lbl">▸ BRIEFING</span>
+        <ul>
+          <li><b>CTI</b> = evidence-based knowledge about a threat, with context and actionable advice</li>
+          <li>Delivered through <b>4 levels</b>: Strategic, Operational, Tactical, Technical</li>
+          <li>Runs as a continuous <b>cycle</b>: Plan → Collect → Analyse → Disseminate</li>
+        </ul>
+      </div>
+      <div class="stat-strip reveal">
+        <div class="stat-block"><span class="num">+54%</span><span class="lbl">Breaches, 2019 vs 2018</span></div>
+        <div class="stat-block"><span class="num">$150M+</span><span class="lbl">Projected avg. breach cost, 2020</span></div>
+      </div>
+      <div class="info-grid reveal">
+        <div class="info-card"><span class="term">STRATEGIC</span><p>High-level posture and business impact — consumed by the board.</p></div>
+        <div class="info-card"><span class="term">OPERATIONAL</span><p>Detail on specific, impending attacks against the organisation.</p></div>
+        <div class="info-card"><span class="term">TACTICAL</span><p>Adversary Tactics, Techniques and Procedures (TTPs).</p></div>
+        <div class="info-card"><span class="term">TECHNICAL</span><p>Machine-consumable indicators feeding firewalls and filters.</p></div>
+      </div>
+      <div class="game-frame reveal">
+        <div class="game-topbar">
+          <span class="stat">MOVES <b id="l1Moves">0</b></span>
+          <span class="stat">MATCHES <b id="l1Matches">0</b>/4</span>
+          <span class="stat">MEMORY MATCH</span>
+        </div>
+        <div class="game-stage" id="l1Stage">
+          <div class="mem-grid" id="l1Grid"></div>
+          <div class="game-overlay" id="l1Overlay">
+            <h3>MEMORY MATCH</h3>
+            <p>Flip two cards at a time. Match each intel level to its audience before you run out of focus.</p>
+            <button class="px-btn" id="l1Start">START CHALLENGE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEVEL 2 — THREATS & IOCs ============ -->
+  <section class="level" id="l2">
+    <div class="wrap">
+      <div class="level-head reveal">
+        <span class="level-num">MODULE 2 / 6</span>
+        <h2 class="level-title">THREATS &amp; INDICATORS</h2>
+      </div>
+      <div class="briefing reveal">
+        <span class="brief-lbl">▸ BRIEFING</span>
+        <ul>
+          <li>Modern attacks are <b>multi-vectored</b> and <b>multi-staged</b>: infiltrate → spread → exfiltrate</li>
+          <li><b>IoCs</b> are the data fundamentals of an attack — the fingerprints it leaves behind</li>
+          <li>Three families: <b>Network</b> (IPs, URLs, domains), <b>Host</b> (hashes, DLLs, registry keys), <b>Email</b> (senders, attachments, links)</li>
+        </ul>
+      </div>
+      <div class="game-frame reveal">
+        <div class="game-topbar">
+          <span class="stat">SCORE <b id="l2Score">0</b></span>
+          <span class="stat">LIVES <b id="l2Lives">3</b></span>
+          <span class="stat">CONVEYOR SORT</span>
+        </div>
+        <div class="game-stage" id="l2Stage">
+          <div class="conveyor-track"></div>
+          <div class="bin-row" id="l2Bins"></div>
+          <div class="game-overlay" id="l2Overlay">
+            <h3>CONVEYOR SORT</h3>
+            <p>IoCs roll down the belt. Drag each one into its correct bin — Network, Host, or Email — before it falls off the end.</p>
+            <button class="px-btn" id="l2Start">START CHALLENGE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEVEL 3 — DATA SOURCES ============ -->
+  <section class="level" id="l3">
+    <div class="wrap">
+      <div class="level-head reveal">
+        <span class="level-num">MODULE 3 / 6</span>
+        <h2 class="level-title">SOURCING THREAT DATA</h2>
+      </div>
+      <div class="briefing reveal">
+        <span class="brief-lbl">▸ BRIEFING</span>
+        <ul>
+          <li>Internal logs, external feeds, and <b>unstructured</b> sources (forums, dark web) all feed CTI</li>
+          <li>Reliability varies wildly — <b>vendor sites and vulnerability DBs</b> score highest on trust</li>
+          <li><b>Blogs and misc. sources</b> score lowest — no single source type excels everywhere</li>
+        </ul>
+      </div>
+      <div class="game-frame reveal">
+        <div class="game-topbar">
+          <span class="stat">SCORE <b id="l3Score">0</b></span>
+          <span class="stat">TRUST <b id="l3Trust">100</b></span>
+          <span class="stat">SOURCE MAZE</span>
+        </div>
+        <div class="game-stage" id="l3Stage" style="display:flex; align-items:center; justify-content:center;">
+          <div class="maze-grid" id="l3Maze"></div>
+          <div class="game-overlay" id="l3Overlay">
+            <h3>SOURCE MAZE</h3>
+            <p>Use arrow keys (or swipe) to crawl the underground. Collect ✓ reliable sources, avoid ☠ unreliable ones.</p>
+            <button class="px-btn" id="l3Start">START CHALLENGE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEVEL 4 — SHARING & STANDARDS ============ -->
+  <section class="level" id="l4">
+    <div class="wrap">
+      <div class="level-head reveal">
+        <span class="level-num">MODULE 4 / 6</span>
+        <h2 class="level-title">SHARING &amp; STANDARDS</h2>
+      </div>
+      <div class="briefing reveal">
+        <span class="brief-lbl">▸ BRIEFING</span>
+        <ul>
+          <li>Disjoint, siloed efforts produce <b>fragmented</b> threat analysis — no one sees the full picture alone</li>
+          <li>Many overlapping formats exist: STIX/TAXII, IODEF/RID, CybOX, OpenIOC</li>
+          <li><b>STIX</b> is the de facto standard — modular, JSON-based, and extensible</li>
+        </ul>
+      </div>
+      <div class="game-frame reveal">
+        <div class="game-topbar">
+          <span class="stat">ROUND <b id="l4Round">1</b>/5</span>
+          <span class="stat">SCORE <b id="l4Score">0</b></span>
+          <span class="stat">SIGNAL DECODER</span>
+        </div>
+        <div class="game-stage" id="l4Stage" style="display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div class="simon-grid" id="l4Grid"></div>
+          <div class="game-overlay" id="l4Overlay">
+            <h3>SIGNAL DECODER</h3>
+            <p>Watch the sequence of standards light up, then repeat it back in the same order. Each round adds one more.</p>
+            <button class="px-btn" id="l4Start">START CHALLENGE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEVEL 5 — THREAT INTELLIGENCE PLATFORMS ============ -->
+  <section class="level" id="l5">
+    <div class="wrap">
+      <div class="level-head reveal">
+        <span class="level-num">MODULE 5 / 6</span>
+        <h2 class="level-title">THREAT INTEL PLATFORMS</h2>
+      </div>
+      <div class="briefing reveal">
+        <span class="brief-lbl">▸ BRIEFING</span>
+        <ul>
+          <li>TIPs <b>collect, normalise, enrich, correlate</b> and disseminate threat data automatically</li>
+          <li><b>MISP</b> is the leading open-source platform; OpenCTI, CRITs and CIF round out the field</li>
+          <li>Today's gap: platforms <b>collect far more than they analyse</b> — trust is often an afterthought</li>
+        </ul>
+      </div>
+      <div class="game-frame reveal">
+        <div class="game-topbar">
+          <span class="stat">SCORE <b id="l5Score">0</b></span>
+          <span class="stat">TIME <b id="l5Time">20</b>s</span>
+          <span class="stat">WHACK THE GAP</span>
+        </div>
+        <div class="game-stage" id="l5Stage">
+          <div class="whack-grid" id="l5Grid"></div>
+          <div class="game-overlay" id="l5Overlay">
+            <h3>WHACK THE GAP</h3>
+            <p>Platform weaknesses will surface. Hit the genuine research gaps, but leave healthy capabilities alone.</p>
+            <button class="px-btn" id="l5Start">START CHALLENGE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LEVEL 6 — BOSS ============ -->
+  <section class="level" id="l6">
+    <div class="wrap">
+      <div class="level-head reveal">
+        <span class="level-num">LEVEL 6 / 6</span>
+        <h2 class="level-title">CS4E BOSS BATTLE</h2>
+      </div>
+      <div class="briefing reveal">
+        <span class="brief-lbl">▸ BRIEFING</span>
+        <ul>
+          <li><b>CyberSec4Europe (CS4E)</b> built a collaborative threat-intelligence platform across European cybersecurity competence networks</li>
+          <li>The platform combines <b>data collection, knowledge management, analytics and controlled sharing</b></li>
+          <li>The real challenge is not only gathering data — it is establishing <b>trust, quality and useful collaboration</b></li>
+        </ul>
+      </div>
+      <div class="game-frame reveal">
+        <div class="game-stage" id="l6Stage" style="min-height:460px;">
+          <div class="boss-arena" id="l6Arena">
+            <div class="game-overlay" id="l6Overlay">
+              <h3>CS4E BOSS BATTLE</h3>
+              <p>Eight questions. Correct answers weaken the platform's failure modes. Wrong answers damage your analyst health.</p>
+              <button class="px-btn" id="l6Start">START CHALLENGE</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>COMP6012 · WEEK 6 · THREAT INTELLIGENCE PLATFORMS<br>Interactive learning edition</footer>
+</main>
+
+<script>
+function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!==undefined)e.innerHTML=html; return e;}
+function rand(min,max){return Math.random()*(max-min)+min;}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ---------- star/grid background ---------- */
+(function(){
+  const svg=document.getElementById('gridBg');
+  const ns='http://www.w3.org/2000/svg';
+  for(let i=0;i<55;i++){
+    const c=document.createElementNS(ns,'circle');
+    c.setAttribute('cx',rand(0,100)+'%'); c.setAttribute('cy',rand(0,100)+'%');
+    c.setAttribute('r',rand(.5,2)); c.setAttribute('fill',i%4===0?'#FFD60A':'#4CC9F0'); c.setAttribute('opacity',rand(.18,.65));
+    svg.appendChild(c);
+  }
+})();
+
+/* ---------- scroll progress / active nav / reveal ---------- */
+const levels=[...document.querySelectorAll('.level')];
+const carts=[...document.querySelectorAll('.cart')];
+function onScroll(){
+  const d=document.documentElement;
+  const max=d.scrollHeight-d.clientHeight;
+  document.getElementById('progressFill').style.width=(max?d.scrollTop/max*100:0)+'%';
+  let idx=-1;
+  levels.forEach((s,i)=>{if(s.getBoundingClientRect().top<innerHeight*.42)idx=i;});
+  carts.forEach((c,i)=>c.classList.toggle('active',i===idx));
+}
+document.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(x=>io.observe(x));
+
+/* ================= L1 MEMORY MATCH ================= */
+(function(){
+  const pairs=[
+    ['STRATEGIC','Board / business leaders'],
+    ['OPERATIONAL','Defenders facing an impending attack'],
+    ['TACTICAL','Security architects / senior security management'],
+    ['TECHNICAL','SOC / incident response systems']
+  ];
+  const grid=document.getElementById('l1Grid'); const ov=document.getElementById('l1Overlay');
+  let moves=0,matches=0,open=[],locked=false;
+  function build(){
+    grid.innerHTML=''; moves=0;matches=0;open=[];locked=false;
+    document.getElementById('l1Moves').textContent=0;document.getElementById('l1Matches').textContent=0;
+    const cards=shuffle(pairs.flatMap((p,i)=>[
+      {pair:i,text:p[0],kind:'level'},
+      {pair:i,text:p[1],kind:'audience'}
+    ]));
+    cards.forEach((c,idx)=>{
+      const card=el('div','mem-card'); card.dataset.pair=c.pair;
+      card.innerHTML='<div class="mem-card-inner"><div class="mem-face mem-front">?</div><div class="mem-face mem-back">'+c.text+'</div></div>';
+      card.addEventListener('click',()=>flip(card)); grid.appendChild(card);
+    });
+  }
+  function flip(card){
+    if(locked||card.classList.contains('flipped')||card.classList.contains('matched'))return;
+    card.classList.add('flipped');open.push(card);
+    if(open.length===2){
+      moves++;document.getElementById('l1Moves').textContent=moves;locked=true;
+      if(open[0].dataset.pair===open[1].dataset.pair){
+        open.forEach(c=>c.classList.add('matched'));matches++;document.getElementById('l1Matches').textContent=matches;open=[];locked=false;
+        if(matches===4)setTimeout(()=>finish(),500);
+      }else setTimeout(()=>{open.forEach(c=>c.classList.remove('flipped'));open=[];locked=false;},700);
+    }
+  }
+  function finish(){
+    ov.style.display='flex';ov.innerHTML='<h3>MEMORY CLEARED</h3><p>You matched all four threat-intelligence levels to their audiences in '+moves+' moves.</p><button class="px-btn alt" id="l1Again">PLAY AGAIN</button>';
+    document.getElementById('l1Again').onclick=()=>{build();ov.style.display='none';};
+  }
+  document.getElementById('l1Start').onclick=()=>{build();ov.style.display='none';};
+})();
+
+/* ================= L2 CONVEYOR SORT ================= */
+(function(){
+  const items=[
+    ['185.199.108.153','network'],['evil.example.com','network'],['https://bad.site/dropper','network'],
+    ['e99a18c428cb38d5f260853678922e03','host'],['evil.dll','host'],['HKCU\\Software\\Run','host'],
+    ['spoof@invoice-mail.com','email'],['invoice.zip attachment','email'],['password-reset link','email']
+  ];
+  const labels={network:'NETWORK',host:'HOST',email:'EMAIL'};
+  const stage=document.getElementById('l2Stage'),bins=document.getElementById('l2Bins'),ov=document.getElementById('l2Overlay');
+  let score=0,lives=3,index=0,current=null,timer=null;
+  Object.keys(labels).forEach(k=>{
+    const b=el('div','bin',labels[k]);b.dataset.type=k;
+    b.addEventListener('dragover',e=>{e.preventDefault();b.classList.add('dragover')});
+    b.addEventListener('dragleave',()=>b.classList.remove('dragover'));
+    b.addEventListener('drop',e=>{e.preventDefault();b.classList.remove('dragover');judge(k)});
+    b.addEventListener('click',()=>judge(k));bins.appendChild(b);
+  });
+  function reset(){score=0;lives=3;index=0;document.getElementById('l2Score').textContent=0;document.getElementById('l2Lives').textContent=3;spawn();}
+  function spawn(){
+    if(current)current.remove();
+    if(index>=items.length||lives<=0)return finish();
+    const item=items[index++];current=el('div','ioc-chip',item[0]);current.dataset.type=item[1];current.draggable=true;
+    current.addEventListener('dragstart',()=>{});stage.appendChild(current);
+    let x=8;current.style.left=x+'px';
+    clearInterval(timer);timer=setInterval(()=>{x+=2.2;current.style.left=x+'px';if(x>stage.clientWidth-120){clearInterval(timer);lives--;document.getElementById('l2Lives').textContent=lives;spawn();}},28);
+  }
+  function judge(type){if(!current)return;clearInterval(timer);if(type===current.dataset.type){score+=10;document.getElementById('l2Score').textContent=score;}else{lives--;document.getElementById('l2Lives').textContent=lives;}spawn();}
+  function finish(){clearInterval(timer);if(current)current.remove();ov.style.display='flex';ov.innerHTML='<h3>CONVEYOR COMPLETE</h3><p>Score: '+score+' · The key skill is recognising whether an indicator belongs to network, host, or email evidence.</p><button class="px-btn alt" id="l2Again">PLAY AGAIN</button>';document.getElementById('l2Again').onclick=()=>{ov.style.display='none';reset();};}
+  document.getElementById('l2Start').onclick=()=>{ov.style.display='none';reset();};
+})();
+
+/* ================= L3 SOURCE MAZE ================= */
+(function(){
+  const layout=[
+    '#############',
+    '#S..#....G..#',
+    '#.#.#.###.#.#',
+    '#.#...#...#.#',
+    '#.###.#.#.#.#',
+    '#...B...#...#',
+    '###.#.#####.#',
+    '#G..#.....B.#',
+    '#.#####.###.#',
+    '#.....G....E#',
+    '#############'
+  ];
+  const grid=document.getElementById('l3Maze'),ov=document.getElementById('l3Overlay');
+  let r=1,c=1,score=0,trust=100,active=false,player=null;
+  function build(){
+    grid.innerHTML='';grid.style.gridTemplateColumns='repeat('+layout[0].length+',34px)';
+    layout.forEach((row,ri)=>[...row].forEach((ch,ci)=>{
+      const cell=el('div','maze-cell'+(ch==='#'?' wall':ch==='G'?' good':ch==='B'?' bad':''));
+      if(ch==='G')cell.textContent='✓';if(ch==='B')cell.textContent='☠';grid.appendChild(cell);
+    }));
+    player=el('div','maze-player');grid.style.position='relative';grid.appendChild(player);place();
+  }
+  function place(){player.style.left=(c*36+4)+'px';player.style.top=(r*36+4)+'px';}
+  function move(dr,dc){
+    if(!active)return;const nr=r+dr,nc=c+dc;if(layout[nr][nc]==='#')return;r=nr;c=nc;place();
+    const ch=layout[r][c];
+    if(ch==='G'){score+=20;document.getElementById('l3Score').textContent=score;}
+    if(ch==='B'){trust=Math.max(0,trust-25);document.getElementById('l3Trust').textContent=trust;}
+    if(ch==='E')finish();
+  }
+  function finish(){active=false;ov.style.display='flex';ov.innerHTML='<h3>MAZE COMPLETE</h3><p>Source trust remaining: '+trust+'%. High-quality CTI depends on source credibility, timeliness, structure and traceability — not just volume.</p><button class="px-btn alt" id="l3Again">PLAY AGAIN</button>';document.getElementById('l3Again').onclick=start;}
+  function start(){r=1;c=1;score=0;trust=100;active=true;document.getElementById('l3Score').textContent=0;document.getElementById('l3Trust').textContent=100;build();ov.style.display='none';}
+  document.getElementById('l3Start').onclick=start;
+  document.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();if(e.key==='ArrowUp')move(-1,0);if(e.key==='ArrowDown')move(1,0);if(e.key==='ArrowLeft')move(0,-1);if(e.key==='ArrowRight')move(0,1);});
+  build();
+})();
+
+/* ================= L4 SIGNAL DECODER ================= */
+(function(){
+  const labels=['STIX','TAXII','IODEF','OpenIOC'];
+  const grid=document.getElementById('l4Grid'),ov=document.getElementById('l4Overlay');
+  let seq=[],input=[],round=1,accept=false,score=0;
+  labels.forEach((l,i)=>{const b=el('button','simon-pad p'+i,l);b.onclick=()=>press(i);grid.appendChild(b);});
+  const pads=[...grid.children];
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  async function flash(){accept=false;input=[];for(const i of seq){pads[i].classList.add('lit');await wait(450);pads[i].classList.remove('lit');await wait(180);}accept=true;}
+  async function press(i){if(!accept)return;pads[i].classList.add('lit');setTimeout(()=>pads[i].classList.remove('lit'),180);input.push(i);const k=input.length-1;if(input[k]!==seq[k])return fail();if(input.length===seq.length){score+=round*10;document.getElementById('l4Score').textContent=score;round++;document.getElementById('l4Round').textContent=Math.min(round,5);if(round>5)return finish();seq.push(Math.floor(Math.random()*4));await wait(650);flash();}}
+  function fail(){accept=false;ov.style.display='flex';ov.innerHTML='<h3>SIGNAL LOST</h3><p>The standards sequence was broken. Shared formats only help when both sides agree on the same structure and transport.</p><button class="px-btn alt" id="l4Again">TRY AGAIN</button>';document.getElementById('l4Again').onclick=start;}
+  function finish(){accept=false;ov.style.display='flex';ov.innerHTML='<h3>SIGNAL DECODED</h3><p>You completed five rounds. STIX structures threat intelligence; TAXII is commonly used to exchange it.</p><button class="px-btn alt" id="l4Again">PLAY AGAIN</button>';document.getElementById('l4Again').onclick=start;}
+  function start(){round=1;score=0;seq=[Math.floor(Math.random()*4)];document.getElementById('l4Round').textContent=1;document.getElementById('l4Score').textContent=0;ov.style.display='none';setTimeout(flash,500);}
+  document.getElementById('l4Start').onclick=start;
+})();
+
+/* ================= L5 WHACK THE GAP ================= */
+(function(){
+  const gaps=['Weak trust scoring','Limited analytics','Data overload','Poor source traceability','Siloed sharing'];
+  const decoys=['Automated collection','Feed ingestion','STIX support','IOC storage'];
+  const grid=document.getElementById('l5Grid'),ov=document.getElementById('l5Overlay');
+  let score=0,time=20,run=null,clock=null,active=false;
+  for(let i=0;i<9;i++){const h=el('div','whack-hole');h.onclick=()=>hit(h);grid.appendChild(h);}
+  function spawn(){[...grid.children].forEach(h=>h.innerHTML='');const h=grid.children[Math.floor(Math.random()*9)];const isGap=Math.random()<.7;const label=(isGap?gaps:decoys)[Math.floor(Math.random()*(isGap?gaps.length:decoys.length))];const m=el('div','whack-mole '+(isGap?'gap':'decoy'),label);m.dataset.kind=isGap?'gap':'decoy';h.appendChild(m);requestAnimationFrame(()=>m.classList.add('up'));}
+  function hit(h){if(!active)return;const m=h.querySelector('.whack-mole.up');if(!m)return;if(m.dataset.kind==='gap')score+=10;else score=Math.max(0,score-10);document.getElementById('l5Score').textContent=score;m.classList.remove('up');}
+  function start(){score=0;time=20;active=true;document.getElementById('l5Score').textContent=0;document.getElementById('l5Time').textContent=time;ov.style.display='none';clearInterval(run);clearInterval(clock);run=setInterval(spawn,650);clock=setInterval(()=>{time--;document.getElementById('l5Time').textContent=time;if(time<=0)finish();},1000);spawn();}
+  function finish(){active=false;clearInterval(run);clearInterval(clock);[...grid.children].forEach(h=>h.innerHTML='');ov.style.display='flex';ov.innerHTML='<h3>GAP ANALYSIS COMPLETE</h3><p>Score: '+score+'. Modern TIPs are strong at collecting and sharing indicators, but analysis quality, trust and source traceability remain critical challenges.</p><button class="px-btn alt" id="l5Again">PLAY AGAIN</button>';document.getElementById('l5Again').onclick=start;}
+  document.getElementById('l5Start').onclick=start;
+})();
+
+/* ================= L6 BOSS BATTLE ================= */
+(function(){
+  const qs=[
+    {q:'Which CTI level is primarily machine-consumable and feeds firewalls or filters?',o:['Strategic','Operational','Tactical','Technical'],a:3},
+    {q:'Which is a host-based IoC?',o:['Domain name','File hash','Sender address','URL'],a:1},
+    {q:'Which source category includes forums, social media and the dark web?',o:['Internal structured','External unstructured','External structured only','Board reporting'],a:1},
+    {q:'What does STIX primarily provide?',o:['A threat intelligence representation format','A password manager','A firewall rule engine','A malware sandbox'],a:0},
+    {q:'A TIP should do more than collect data. Which capability turns isolated indicators into connected context?',o:['Correlation / analysis','Screen brightness','Disk formatting','User provisioning'],a:0},
+    {q:'Why combine multiple intelligence sources?',o:['No source is perfect across every quality dimension','To make reports longer','To avoid using internal telemetry','Because structured feeds are always wrong'],a:0},
+    {q:'Which statement best describes the CTI process?',o:['A one-time report','A continuous planning, collection, analysis and dissemination cycle','Only malware analysis','Only external feed collection'],a:1},
+    {q:'In collaborative CTI, what is a major challenge beyond simply sharing more data?',o:['Trust and quality','Keyboard layout','Screen resolution','File compression'],a:0}
+  ];
+  const arena=document.getElementById('l6Arena'),ov=document.getElementById('l6Overlay');let i=0,player=100,boss=100;
+  function draw(){
+    arena.querySelectorAll('.boss-ui').forEach(x=>x.remove());
+    if(i>=qs.length||boss<=0||player<=0)return finish();
+    const q=qs[i];const ui=el('div','boss-ui');ui.style.cssText='display:flex;flex-direction:column;align-items:center;gap:16px;width:100%';
+    ui.innerHTML='<div class="health-row"><div class="health-block"><span class="health-label">ANALYST '+player+'%</span><div class="health-track"><div class="health-fill player" style="width:'+player+'%"></div></div></div><div class="health-block"><span class="health-label">PLATFORM RISK '+boss+'%</span><div class="health-track"><div class="health-fill boss" style="width:'+boss+'%"></div></div></div></div><div class="boss-sprite"></div><div class="boss-q">'+q.q+'</div><div class="boss-opts"></div>';
+    const opts=ui.querySelector('.boss-opts');q.o.forEach((t,j)=>{const b=el('button','boss-opt',t);b.onclick=()=>answer(j,b,opts,q.a);opts.appendChild(b)});arena.appendChild(ui);
+  }
+  function answer(j,b,opts,a){[...opts.children].forEach(x=>x.disabled=true);if(j===a){b.classList.add('correct');boss=Math.max(0,boss-14);}else{b.classList.add('incorrect');opts.children[a].classList.add('correct');player=Math.max(0,player-20);}i++;setTimeout(draw,650);}
+  function finish(){arena.querySelectorAll('.boss-ui').forEach(x=>x.remove());ov.style.display='flex';const win=player>0&&boss<=0||player>0&&i>=qs.length;ov.innerHTML='<h3>'+(win?'PLATFORM SECURED':'ANALYST OFFLINE')+'</h3><p>'+(win?'You connected CTI fundamentals, indicators, sources, sharing standards and platform challenges.':'Review the briefings and try the platform assessment again.')+'</p><button class="px-btn alt" id="l6Again">RESTART</button>';document.getElementById('l6Again').onclick=start;}
+  function start(){i=0;player=100;boss=100;ov.style.display='none';draw();}
+  document.getElementById('l6Start').onclick=start;
+})();
+</script>
+</body>
+</html>
